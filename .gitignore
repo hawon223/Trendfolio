@@ -2,3 +2,4 @@
 /.vscode
 data/
 output/
+/src/__pycache__
