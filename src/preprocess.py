@@ -78,41 +78,42 @@ def tag_signals(text):
 with open(RAW_PATH, "r", encoding="utf-8") as f:
     raw_news = json.load(f)
 
-processed_news = []
+def preprocess_news(raw_news):
+    processed_news = []
 
-for item in raw_news:
-    title = item.get("title", "")
-    summary = item.get("summary", "")
+    for item in raw_news:
+        title = item.get("title", "")
+        summary = item.get("summary", "")
 
-    # HTML 제거
-    cleaned_summary = clean_html(summary)
+        # HTML 제거
+        cleaned_summary = clean_html(summary)
 
-    # 출처 제거
-    cleaned_summary = remove_source(cleaned_summary)
+        # 출처 제거
+        cleaned_summary = remove_source(cleaned_summary)
 
-    # 텍스트 정규화
-    cleaned_summary = normalize_text(cleaned_summary)
+        # 텍스트 정규화
+        cleaned_summary = normalize_text(cleaned_summary)
 
-    # title
-    content = normalize_text(title)
+        # title
+        content = normalize_text(title)
 
-    # 종목 태그 추가
-    assets = tag_assets(content)
-    signals = tag_signals(content)
+        # 종목 태그 추가
+        assets = tag_assets(content)
+        signals = tag_signals(content)
 
-    processed_item = {
-        "title": title,
-        "content": content,
-        "assets": assets,
-        "signals": signals,
-        "published": item.get("published", "")
-}
+        processed_item = {
+            "title": title,
+            "content": content,
+            "assets": assets,
+            "signals": signals,
+            "published": item.get("published", "")
+    }
 
 
-    processed_news.append(processed_item)
+        processed_news.append(processed_item)
     
     
-with open(PROCESSED_PATH, "w", encoding="utf-8") as f:
-    json.dump(processed_news, f, ensure_ascii=False, indent=2)
-
-print(f"정제 완료: {len(processed_news)}건 → {PROCESSED_PATH}")
+    with open(PROCESSED_PATH, "w", encoding="utf-8") as f:
+        json.dump(processed_news, f, ensure_ascii=False, indent=2)
+    
+    print(f"정제 완료: {len(processed_news)}건 → {PROCESSED_PATH}")
