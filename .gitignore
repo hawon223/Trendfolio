@@ -3,3 +3,5 @@
 data/
 output/
 /src/__pycache__
+db/*.db
+logs/

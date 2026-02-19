@@ -1,11 +1,14 @@
 import json
 import os
+import sqlite3
+import logging
 from collections import defaultdict
 from datetime import datetime
 
 # 설정 값
 INPUT_PATH = "data/processed/news_cleaned.json"
 OUTPUT_PATH = "output/signals.json"
+DB_PATH = "db/news_signals.db"
 
 # 시그널별 가중치 점수
 SIGNAL_SCORE = {
@@ -14,6 +17,26 @@ SIGNAL_SCORE = {
     "bearish": -2, # 하락 약세
     "sell": -1     # 매도
 }
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# db 초기화
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS news_signals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        asset TEXT NOT NULL,
+        score INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(date, asset)
+    )
+    """)
+    conn.commit()
+    return conn, cursor
+
 
 def load_data(path):
     """파일로부터 데이터를 로드 (독립 실행 시 필요)"""
@@ -53,35 +76,42 @@ def aggregate_signals(news_data):
 
     return daily_scores
 
+
+def save_to_db(cursor, conn, date, asset, score):
+    try:
+        cursor.execute(
+            "INSERT INTO news_signals (date, asset, score) VALUES (?, ?, ?)",
+            (date, asset, score)
+        )
+        conn.commit()
+        logging.info(f"DB 저장 완료: {date} | {asset}")
+    except sqlite3.IntegrityError:
+        logging.warning(f"중복 데이터 건너뜀: {date} | {asset}")
+    except Exception as e:
+        logging.error(f"DB 저장 실패: {date} | {asset} ({e})")
+        
+        
 def generate_signals(news_data=None):
-    """
-    pipeline.py에서 호출하는 메인 함수입니다.
-    데이터를 입력받아 최종 시그널 결과를 생성하고 저장합니다.
-    """
-    # 1. 데이터 로드 (인자가 없으면 직접 파일 읽기)
     if news_data is None:
         news_data = load_data(INPUT_PATH)
-
     if not news_data:
-        print("분석할 뉴스 데이터가 없습니다.")
+        logging.info("분석할 뉴스 데이터가 없습니다.")
         return []
 
-    # 2. 시그널 집계
+    # 시그널 집계
     daily_scores = aggregate_signals(news_data)
 
-    # 3. 결과 포맷 변환 (Dictionary -> List of Dicts)
-    final_results = []
+    # DB 저장
+    conn, cursor = init_db()
     for (date, asset), score in daily_scores.items():
-        final_results.append({
-            "date": date,
-            "asset": asset,
-            "score": score
-        })
+        save_to_db(cursor, conn, date, asset, score)
+    conn.close()
 
-    # 4. 결과 저장
+    # JSON 저장
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    final_results = [{"date": d, "asset": a, "score": s} for (d, a), s in daily_scores.items()]
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(final_results, f, ensure_ascii=False, indent=2)
 
-    print(f"시그널 집계 완료: {len(final_results)}개의 결과 생성")
+    logging.info(f"시그널 집계 완료: {len(final_results)}개의 결과 생성")
     return final_results
