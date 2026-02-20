@@ -5,3 +5,4 @@ output/
 /src/__pycache__
 db/*.db
 logs/
+/api/__pycache__
